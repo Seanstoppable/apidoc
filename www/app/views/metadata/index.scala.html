@@ -1,0 +1,24 @@
+@(tpl: models.MainTemplate)(implicit flash: Flash)
+
+@main(tpl) {
+
+  @tpl.org.map { org =>
+    <div class="pull-right">
+      <span class="glyphicon glyphicon-plus"></span> <a href="@routes.Metdata.edit(org.key)">Edit</a>
+    </div>
+
+    <h2>Package name</h2>
+
+    <p>
+      <b>Package name:</b>
+      @org.metadata.packageName.getOrElse("N/A")
+    </p>
+
+    <p>For code generation in languages that use package names
+    (e.g. scala) you can specify the top level package name for your
+    organization. All generated code will automatically be a submodule
+    of this package.</p>
+
+  }
+
+}

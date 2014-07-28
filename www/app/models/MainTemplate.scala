@@ -22,6 +22,7 @@ case class SettingsMenu(
 
 case class SettingSection(name: String)
 object SettingSection {
+  val Metadata = SettingSection("metadata")
   val Domains = SettingSection("domains")
   val Members = SettingSection("members")
 }
