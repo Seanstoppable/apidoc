@@ -38,6 +38,19 @@ private[core] case class InternalServiceDescription(json: JsValue) {
     }
   }
 
+  lazy val enums: Seq[InternalEnum] = {
+    (json \ "enums").asOpt[JsObject] match {
+      case None => Seq.empty
+      case Some(enums: JsObject) => {
+        enums.fields.map { v =>
+          v match {
+            case(key, value) => InternalEnum(key, value.as[JsObject])
+          }
+        }
+      }
+    }
+  }
+
   lazy val resources: Seq[InternalResource] = {
     (json \ "resources").asOpt[JsValue] match {
       case None => Seq.empty
@@ -69,10 +82,23 @@ private[core] case class InternalServiceDescription(json: JsValue) {
 
 }
 
-case class InternalModel(name: String,
-                         plural: String,
-                         description: Option[String],
-                         fields: Seq[InternalField])
+case class InternalModel(
+  name: String,
+  plural: String,
+  description: Option[String],
+  fields: Seq[InternalField]
+)
+
+case class InternalEnum(
+  name: String,
+  description: Option[String],
+  values: Seq[InternalEnumValue]
+)
+
+case class InternalEnumValue(
+  name: Option[String],
+  description: Option[String]
+)
 
 case class InternalResource(modelName: Option[String],
                             path: String,
@@ -96,7 +122,6 @@ case class InternalField(name: Option[String] = None,
                          required: Boolean = true,
                          multiple: Boolean = false,
                          default: Option[String] = None,
-                         enum: Seq[String] = Seq.empty,
                          example: Option[String] = None,
                          minimum: Option[Long] = None,
                          maximum: Option[Long] = None)
@@ -147,6 +172,29 @@ object InternalModel {
                   plural = plural,
                   description = description,
                   fields = fields)
+  }
+
+}
+
+object InternalEnum {
+
+  def apply(name: String, value: JsObject): InternalEnum = {
+    val description = (value \ "description").asOpt[String]
+    val values = (value \ "values").asOpt[JsArray] match {
+      case None => Seq.empty
+      case Some(a: JsArray) => a.value.map { json =>
+        InternalEnumValue(
+          name = (json \ "name").asOpt[String],
+          description = (json \ "description").asOpt[String]
+        )
+      }
+    }
+
+    InternalEnum(
+      name = name,
+      description = description,
+      values = values
+    )
   }
 
 }
@@ -236,20 +284,12 @@ object InternalField {
   def apply(json: JsObject): InternalField = {
     val parsedDatatype = (json \ "type").asOpt[String].map( InternalParsedDatatype(_) )
 
-    val enum = (json \ "enum").asOpt[JsArray] match {
-      case None => Seq.empty
-      case Some(a: JsArray) => {
-        a.value.flatMap { value => JsonStringParser.asOptString(value) }
-      }
-    }
-
     InternalField(name = (json \ "name").asOpt[String],
                   fieldtype = parsedDatatype.map(_.name),
                   description = (json \ "description").asOpt[String],
                   required = JsonStringParser.asOptBoolean(json \ "required").getOrElse(true),
                   multiple = parsedDatatype.map(_.multiple).getOrElse(false),
                   default = JsonStringParser.asOptString(json, "default"),
-                  enum = enum,
                   minimum = (json \ "minimum").asOpt[Long],
                   maximum = (json \ "maximum").asOpt[Long],
                   example = JsonStringParser.asOptString(json, "example"))

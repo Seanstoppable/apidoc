@@ -21,6 +21,7 @@ object ServiceDescription {
 case class ServiceDescription(internal: InternalServiceDescription) {
 
   lazy val models: Seq[Model] = internal.models.map { Model(this, _) }.sortBy(_.name.toLowerCase)
+  lazy val enums: Seq[Enum] = internal.enums.map { Enum(this, _) }.sortBy(_.name.toLowerCase)
   lazy val resources: Seq[Resource] = internal.resources.map { Resource(models, _) }.sorted
   lazy val baseUrl: Option[String] = internal.baseUrl
   lazy val name: String = internal.name.getOrElse { sys.error("Missing name") }
@@ -51,6 +52,24 @@ case class Model(name: String,
   }
 
 }
+
+case class Enum(
+  name: String,
+  description: Option[String],
+  values: Seq[EnumValue]
+) extends Ordered[Enum] {
+  require(Text.isValidName(name), s"Enum name[$name] is invalid - can only contain alphanumerics and underscores and must start with a letter")
+
+  def compare(that: Enum): Int = {
+    name.toLowerCase.compare(that.name.toLowerCase)
+  }
+
+}
+
+case class EnumValue(
+  name: String,
+  description: Option[String]
+)
 
 case class Resource(model: Model,
                     path: String,
@@ -197,6 +216,23 @@ object Model {
           plural = im.plural,
           description = im.description,
           fields = im.fields.map { Field(im, _) })
+  }
+
+}
+
+object Enum {
+
+  def apply(sd: ServiceDescription, ie: InternalEnum): Enum = {
+    Enum(
+      name = ie.name,
+      description = ie.description,
+      values = ie.values.map { v =>
+        EnumValue(
+          name = v.name.get,
+          description = v.description
+        )
+      }
+    )
   }
 
 }
@@ -364,7 +400,7 @@ object Field {
     }
 
     Field(name = internal.name.get,
-          fieldtype = parseTypeAndValues(internal.name.get, fieldtype, internal.enum),
+          fieldtype = fieldtype,
           description = internal.description,
           required = internal.required,
           multiple = internal.multiple,
@@ -372,23 +408,6 @@ object Field {
           minimum = internal.minimum.map(_.toLong),
           maximum = internal.maximum.map(_.toLong),
           example = internal.example)
-  }
-
-  /**
-    * If we have an enum, validate the values and convert field type
-    * into an enumeration.
-    */
-  private def parseTypeAndValues(fieldName: String, fieldtype: FieldType, enum: Seq[String]): FieldType = {
-    if (enum.isEmpty) {
-      fieldtype
-    } else {
-      assert(fieldtype == PrimitiveFieldType(Datatype.StringType), "Field type must be string for enumerations")
-      enum.foreach { value =>
-        val errors = Text.validateName(value)
-        assert(errors.isEmpty, s"Field[${fieldName}] has an invalid value[${value}]: " + errors.mkString(" "))
-      }
-      EnumerationFieldType(Datatype.StringType, enum)
-    }
   }
 
   private val BooleanValues = Seq("true", "false")
