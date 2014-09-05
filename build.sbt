@@ -9,7 +9,8 @@ lazy val core = project
     // play-json needs this to resolve correctly when not using Gilt's internal mirrors
     resolvers += "Typesafe Maven Repository" at "http://repo.typesafe.com/typesafe/maven-releases/",
     libraryDependencies ++= Seq(
-      "com.typesafe.play" %% "play-json" % "2.3.0"
+      "com.typesafe.play" %% "play-json" % "2.3.0",
+      "org.mindrot"       %  "jbcrypt"   % "0.3m"
     )
   )
 
@@ -23,8 +24,7 @@ lazy val api = project
     libraryDependencies ++= Seq(
       jdbc,
       anorm,
-      "org.postgresql" % "postgresql" % "9.3-1101-jdbc4",
-      "org.mindrot"    %  "jbcrypt"   % "0.3m"
+      "org.postgresql" % "postgresql" % "9.3-1101-jdbc4"
     )
   )
 

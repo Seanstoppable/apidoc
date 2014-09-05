@@ -1,5 +1,6 @@
 package db
 
+import core.password.Algorithm
 import com.gilt.apidoc.models.User
 import lib.Constants
 import anorm._
@@ -8,80 +9,9 @@ import play.api.Play.current
 import play.api.libs.json._
 import java.util.UUID
 import java.sql.Connection
-import org.mindrot.jbcrypt.BCrypt
 import org.apache.commons.codec.binary.Base64
 
-private[db] case class HashedPassword(hash: String)
-
-sealed trait PasswordAlgorithm {
-
-  /**
-   * Uniquely identifies this password algorithm
-   */
-  def key: String
-
-  /**
-   * Hashes the provided String, returning the hashed value
-   */
-  def hash(password: String): HashedPassword
-
-  /**
-   * Check if a cleartext password is valid
-   */
-  def check(candidate: String, hashed: String): Boolean
-
-}
-
-case class BcryptPasswordAlgorithm(override val key: String) extends PasswordAlgorithm {
-
-  private val LogRounds = 10
-
-  override def hash(password: String): HashedPassword = {
-    val salt = BCrypt.gensalt(LogRounds)
-    HashedPassword(BCrypt.hashpw(password, salt))
-  }
-
-  override def check(candidate: String, hashed: String): Boolean = {
-    BCrypt.checkpw(candidate, hashed)
-  }
-
-}
-
-/**
- * Used only when fetching unknown keys from DB but will fail if you try to hash
- */
-private[db] case class UnknownPasswordAlgorithm(override val key: String) extends PasswordAlgorithm {
-
-  override def hash(password: String): HashedPassword = {
-    sys.error("Unsupported operation for uknown password hash")
-  }
-
-  override def check(candidate: String, hashed: String) = false
-
-}
-
-object PasswordAlgorithm {
-
-  val All = Seq(
-    new BcryptPasswordAlgorithm("bcrypt"),
-    new UnknownPasswordAlgorithm("unknown")
-  )
-
-  val Latest = fromString("bcrypt").getOrElse {
-    sys.error("Could not find latest algorithm")
-  }
-
-  val Unknown = fromString("unknown").getOrElse {
-    sys.error("Could not find unknown algorithm")
-  }
-
-  def fromString(value: String): Option[PasswordAlgorithm] = {
-    All.find(_.key == value)
-  }
-
-}
-
-case class UserPassword(guid: UUID, userGuid: UUID, algorithm: PasswordAlgorithm, hash: String)
+case class UserPassword(guid: UUID, userGuid: UUID, algorithm: Algorithm, hash: String)
 
 object UserPasswordDao {
 
@@ -119,7 +49,7 @@ object UserPasswordDao {
     cleartextPassword: String
   ) {
     val guid = UUID.randomUUID
-    val algorithm = PasswordAlgorithm.Latest
+    val algorithm = Algorithm.Latest
     val hashedPassword = algorithm.hash(cleartextPassword)
 
     SQL(InsertQuery).on(
@@ -160,7 +90,7 @@ object UserPasswordDao {
         UserPassword(
           guid = UUID.fromString(row[String]("guid")),
           userGuid = UUID.fromString(row[String]("user_guid")),
-          algorithm = PasswordAlgorithm.fromString(row[String]("algorithm_key")).getOrElse(PasswordAlgorithm.Unknown),
+          algorithm = Algorithm.fromString(row[String]("algorithm_key")).getOrElse(Algorithm.Unknown),
           hash = new String(Base64.decodeBase64(row[String]("hash").getBytes))
         )
       }.toSeq.headOption
